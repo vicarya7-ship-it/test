@@ -27,6 +27,95 @@ function drawCoverImage(context, image, width, height) {
   context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
 }
 
+function drawTilePattern(context, x, y, size, row, column) {
+  const inset = size * 0.14;
+  const patternSpan = size - inset * 2;
+  const lineStep = Math.max(12, Math.floor(size / 5));
+
+  context.save();
+  context.lineWidth = Math.max(2, size * 0.012);
+  context.strokeStyle = row % 2 === column % 2 ? "rgba(255,255,255,0.16)" : "rgba(139,0,0,0.22)";
+
+  if ((row + column) % 2 === 0) {
+    for (let offset = -patternSpan; offset <= patternSpan; offset += lineStep) {
+      context.beginPath();
+      context.moveTo(x + inset + offset, y + size - inset);
+      context.lineTo(x + inset + offset + patternSpan, y + inset);
+      context.stroke();
+    }
+  } else {
+    const centerX = x + size / 2;
+    const centerY = y + size / 2;
+
+    for (let radius = patternSpan * 0.12; radius <= patternSpan * 0.42; radius += patternSpan * 0.1) {
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.stroke();
+    }
+  }
+
+  context.restore();
+}
+
+function drawGuideOverlay(context, boardSize, grid, stageName) {
+  const tileSize = boardSize / grid;
+
+  context.save();
+
+  for (let row = 0; row < grid; row += 1) {
+    for (let column = 0; column < grid; column += 1) {
+      const x = column * tileSize;
+      const y = row * tileSize;
+      const pieceId = row * grid + column + 1;
+
+      context.fillStyle = (row + column) % 2 === 0 ? "rgba(8, 6, 4, 0.12)" : "rgba(255, 255, 255, 0.04)";
+      context.fillRect(x, y, tileSize, tileSize);
+
+      drawTilePattern(context, x, y, tileSize, row, column);
+
+      const plateWidth = tileSize * 0.28;
+      const plateHeight = tileSize * 0.18;
+      const plateX = x + tileSize * 0.06;
+      const plateY = y + tileSize * 0.06;
+
+      context.fillStyle = "rgba(8, 6, 4, 0.68)";
+      context.fillRect(plateX, plateY, plateWidth, plateHeight);
+      context.strokeStyle = "rgba(200, 184, 154, 0.42)";
+      context.lineWidth = Math.max(2, tileSize * 0.01);
+      context.strokeRect(plateX, plateY, plateWidth, plateHeight);
+
+      context.fillStyle = "rgba(255, 244, 225, 0.92)";
+      context.font = `700 ${Math.floor(tileSize * 0.11)}px "Noto Serif JP", serif`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(String(pieceId), plateX + plateWidth / 2, plateY + plateHeight / 2);
+
+      context.fillStyle = "rgba(255,255,255,0.18)";
+      context.font = `600 ${Math.floor(tileSize * 0.06)}px "Noto Serif JP", serif`;
+      context.fillText(stageName, x + tileSize * 0.5, y + tileSize * 0.87);
+    }
+  }
+
+  context.strokeStyle = "rgba(139, 0, 0, 0.36)";
+  context.lineWidth = Math.max(2, tileSize * 0.018);
+
+  for (let index = 1; index < grid; index += 1) {
+    const lineOffset = index * tileSize;
+
+    context.beginPath();
+    context.moveTo(lineOffset, 0);
+    context.lineTo(lineOffset, boardSize);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(0, lineOffset);
+    context.lineTo(boardSize, lineOffset);
+    context.stroke();
+  }
+
+  context.restore();
+}
+
 export function createPlaceholderImage(width, height, text) {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
@@ -87,6 +176,7 @@ async function buildTileTextures(stage) {
 
   const sourceContext = sourceCanvas.getContext("2d");
   drawCoverImage(sourceContext, sourceImage, boardSize, boardSize);
+  drawGuideOverlay(sourceContext, boardSize, grid, stage.name);
 
   const textures = new Map();
 
@@ -319,6 +409,11 @@ export class SlidePuzzle {
       element.dataset.pieceId = String(pieceId);
       element.tabIndex = this.enabled ? 0 : -1;
       element.setAttribute("aria-label", `ピース ${pieceId}`);
+
+      const label = document.createElement("span");
+      label.className = "puzzle-tile-index";
+      label.textContent = String(pieceId);
+      element.appendChild(label);
 
       this.boardElement.appendChild(element);
     });

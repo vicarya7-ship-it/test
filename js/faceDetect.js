@@ -1,6 +1,29 @@
 const MODEL_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
-const EAR_THRESHOLD = 0.2;
+const DEFAULT_EAR_THRESHOLD = 0.21;
+const MIN_EAR_THRESHOLD = 0.18;
+const MAX_EAR_THRESHOLD = 0.26;
 const CLOSED_GRACE_MS = 500;
+
+const CAMERA_CONSTRAINTS = [
+  {
+    facingMode: { exact: "user" },
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+  },
+  {
+    facingMode: { ideal: "user" },
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+  },
+  {
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+  },
+];
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
 
 function distance(pointA, pointB) {
   return Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
@@ -44,6 +67,27 @@ function waitForFaceApi(timeoutMs = 12000) {
   });
 }
 
+async function requestCameraStream() {
+  let lastError = null;
+
+  for (const video of CAMERA_CONSTRAINTS) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video,
+      });
+    } catch (error) {
+      if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
+        throw error;
+      }
+
+      lastError = error;
+    }
+  }
+
+  throw lastError ?? new Error("カメラに接続できませんでした。");
+}
+
 export class FaceDetector {
   constructor({ videoElement, onStateChange }) {
     this.videoElement = videoElement;
@@ -55,11 +99,19 @@ export class FaceDetector {
     this.animationFrameId = 0;
     this.stream = null;
     this.closedSince = 0;
+    this.openEyeBaseline = 0;
+    this.cameraLabel = "";
+    this.cameraFacingMode = "";
+
     this.lastState = {
       eyeOpen: true,
       faceDetected: false,
       leftEar: 0,
       rightEar: 0,
+      averageEar: 0,
+      threshold: DEFAULT_EAR_THRESHOLD,
+      cameraLabel: "",
+      cameraFacingMode: "",
     };
   }
 
@@ -79,16 +131,16 @@ export class FaceDetector {
       throw new Error("このブラウザではカメラ API を利用できません。");
     }
 
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        facingMode: { ideal: "user" },
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-      },
-    });
-
+    this.stream = await requestCameraStream();
     this.videoElement.srcObject = this.stream;
+
+    const [videoTrack] = this.stream.getVideoTracks();
+    const settings = videoTrack?.getSettings?.() ?? {};
+
+    this.cameraLabel = videoTrack?.label ?? "";
+    this.cameraFacingMode = settings.facingMode ?? "";
+    this.videoElement.width = settings.width ?? 1280;
+    this.videoElement.height = settings.height ?? 720;
 
     await new Promise((resolve) => {
       if (this.videoElement.readyState >= 1) {
@@ -100,6 +152,11 @@ export class FaceDetector {
     });
 
     await this.videoElement.play();
+    this.emitState({
+      ...this.lastState,
+      cameraLabel: this.cameraLabel,
+      cameraFacingMode: this.cameraFacingMode,
+    });
   }
 
   start() {
@@ -136,8 +193,8 @@ export class FaceDetector {
             .detectSingleFace(
               this.videoElement,
               new faceapi.TinyFaceDetectorOptions({
-                inputSize: 224,
-                scoreThreshold: 0.4,
+                inputSize: 320,
+                scoreThreshold: 0.25,
               })
             )
             .withFaceLandmarks(true);
@@ -154,6 +211,28 @@ export class FaceDetector {
     });
   }
 
+  getThreshold() {
+    if (!this.openEyeBaseline) {
+      return DEFAULT_EAR_THRESHOLD;
+    }
+
+    return clamp(this.openEyeBaseline - 0.03, MIN_EAR_THRESHOLD, MAX_EAR_THRESHOLD);
+  }
+
+  updateBaseline(averageEar) {
+    if (!Number.isFinite(averageEar) || averageEar <= 0.12) {
+      return;
+    }
+
+    if (!this.openEyeBaseline) {
+      this.openEyeBaseline = averageEar;
+      return;
+    }
+
+    const blend = averageEar > this.openEyeBaseline ? 0.18 : 0.08;
+    this.openEyeBaseline = this.openEyeBaseline * (1 - blend) + averageEar * blend;
+  }
+
   processDetection(detection) {
     const now = performance.now();
 
@@ -164,6 +243,10 @@ export class FaceDetector {
         faceDetected: false,
         leftEar: 0,
         rightEar: 0,
+        averageEar: 0,
+        threshold: this.getThreshold(),
+        cameraLabel: this.cameraLabel,
+        cameraFacingMode: this.cameraFacingMode,
       });
       return;
     }
@@ -171,7 +254,14 @@ export class FaceDetector {
     const leftEar = calculateEar(detection.landmarks.getLeftEye());
     const rightEar = calculateEar(detection.landmarks.getRightEye());
     const averageEar = (leftEar + rightEar) / 2;
-    const eyesClosed = averageEar < EAR_THRESHOLD;
+
+    if (!this.openEyeBaseline && averageEar > 0.14) {
+      this.openEyeBaseline = averageEar;
+    }
+
+    let threshold = this.getThreshold();
+    const ratioClosed = this.openEyeBaseline > 0 ? averageEar / this.openEyeBaseline < 0.88 : false;
+    const eyesClosed = averageEar < threshold || ratioClosed;
 
     if (eyesClosed && this.closedSince === 0) {
       this.closedSince = now;
@@ -179,6 +269,8 @@ export class FaceDetector {
 
     if (!eyesClosed) {
       this.closedSince = 0;
+      this.updateBaseline(averageEar);
+      threshold = this.getThreshold();
     }
 
     const closedLongEnough = eyesClosed && now - this.closedSince >= CLOSED_GRACE_MS;
@@ -188,6 +280,10 @@ export class FaceDetector {
       faceDetected: true,
       leftEar,
       rightEar,
+      averageEar,
+      threshold,
+      cameraLabel: this.cameraLabel,
+      cameraFacingMode: this.cameraFacingMode,
     });
   }
 

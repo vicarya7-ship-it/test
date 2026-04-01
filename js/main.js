@@ -49,6 +49,7 @@ const elements = {
   cameraFeed: document.querySelector("#camera-feed"),
   eyeStatusIndicator: document.querySelector("#eye-status-indicator"),
   eyeStatusText: document.querySelector("#eye-status-text"),
+  cameraDebugText: document.querySelector("#camera-debug-text"),
   stageName: document.querySelector("#game-stage-name"),
   timerText: document.querySelector("#timer-text"),
   moveCount: document.querySelector("#move-count"),
@@ -78,7 +79,16 @@ const elements = {
 const state = {
   currentStage: null,
   completedStages: loadCompletedStages(),
-  lastFaceState: { eyeOpen: true, faceDetected: true },
+  lastFaceState: {
+    eyeOpen: true,
+    faceDetected: false,
+    leftEar: 0,
+    rightEar: 0,
+    averageEar: 0,
+    threshold: 0.21,
+    cameraLabel: "",
+    cameraFacingMode: "",
+  },
   gameActive: false,
   elapsedTimerId: 0,
   elapsedSeconds: 0,
@@ -123,20 +133,28 @@ function resetGameOverScreen() {
 }
 
 function updateEyeStatus(stateSnapshot) {
+  const cameraName =
+    stateSnapshot.cameraFacingMode === "user"
+      ? "前面カメラ"
+      : stateSnapshot.cameraLabel || "カメラ";
+
   if (!stateSnapshot.faceDetected) {
     elements.eyeStatusIndicator.dataset.state = "missing";
     elements.eyeStatusText.textContent = "逸らしている";
+    elements.cameraDebugText.textContent = `${cameraName}で顔を検出できていません。正面を向いて少し明るくしてください。`;
     return;
   }
 
   if (!stateSnapshot.eyeOpen) {
     elements.eyeStatusIndicator.dataset.state = "closed";
     elements.eyeStatusText.textContent = "閉じている";
+    elements.cameraDebugText.textContent = `${cameraName} / EAR ${stateSnapshot.averageEar.toFixed(2)} / 閉眼基準 ${stateSnapshot.threshold.toFixed(2)}`;
     return;
   }
 
   elements.eyeStatusIndicator.dataset.state = "open";
   elements.eyeStatusText.textContent = "開いている";
+  elements.cameraDebugText.textContent = `${cameraName} / EAR ${stateSnapshot.averageEar.toFixed(2)} / 閉眼基準 ${stateSnapshot.threshold.toFixed(2)}`;
 }
 
 function renderStageGrid() {

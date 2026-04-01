@@ -77,9 +77,12 @@
       <section id="screen-game" class="screen" aria-labelledby="game-stage-name" data-horror-level="0">
         <div id="game-shell" class="game-shell">
           <header class="status-bar">
-            <div id="eye-status-indicator" class="status-pill">
-              <span class="status-icon" aria-hidden="true">👁️</span>
-              <span id="eye-status-text">開いている</span>
+            <div id="eye-status-indicator" class="status-pill status-pill-detection">
+              <div class="status-pill-main">
+                <span class="status-icon" aria-hidden="true">👁️</span>
+                <span id="eye-status-text">開いている</span>
+              </div>
+              <p id="camera-debug-text" class="camera-debug-text">カメラの認識状態を確認しています…</p>
             </div>
             <div class="status-stage">
               <p class="status-label">探索中</p>
@@ -131,7 +134,9 @@
             </div>
 
             <div id="puzzle-board" class="puzzle-board" role="grid" aria-live="polite"></div>
-            <p class="puzzle-note">隣り合うピースのみ動かせます。完成させれば脱出成功です。</p>
+            <p class="puzzle-note">
+              隣り合うピースのみ動かせます。絵柄と札番号がつながるように揃えれば脱出成功です。
+            </p>
           </section>
         </div>
       </section>
