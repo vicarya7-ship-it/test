@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>眼を、閉じるな。</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"
+    ></script>
+    <script type="module" src="js/main.js"></script>
+  </head>
+  <body>
+    <video id="camera-feed" autoplay muted playsinline aria-hidden="true"></video>
+
+    <main class="app-shell">
+      <section id="screen-camera" class="screen is-active" aria-labelledby="camera-title">
+        <div class="panel panel-centered">
+          <p class="eyebrow">儀式の準備</p>
+          <h1 id="camera-title" class="panel-title">👁️ カメラのアクセスを許可してください</h1>
+          <div id="model-spinner" class="camera-loader" aria-hidden="true"></div>
+          <p id="camera-status" class="panel-copy">face-api.js のモデルを読み込んでいます…</p>
+          <button id="camera-start-button" class="ghost-button" type="button" disabled>
+            カメラを起動する
+          </button>
+          <p class="helper-text">
+            カメラ映像は非表示のまま目の状態だけを判定します。音はブラウザ上で合成されます。
+          </p>
+        </div>
+      </section>
+
+      <section id="screen-camera-error" class="screen" aria-labelledby="camera-error-title">
+        <div class="panel panel-centered">
+          <p class="eyebrow">準備失敗</p>
+          <h1 id="camera-error-title" class="panel-title">カメラを利用できませんでした</h1>
+          <p id="camera-error-message" class="panel-copy">
+            ブラウザ設定でカメラの許可を有効にしてから、もう一度お試しください。
+          </p>
+          <div class="button-row">
+            <button id="camera-retry-button" class="ghost-button" type="button">
+              もう一度試す
+            </button>
+            <button id="camera-back-button" class="ghost-button ghost-button-subtle" type="button">
+              許可画面へ戻る
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-title" class="screen" aria-labelledby="title-heading">
+        <div class="panel title-panel">
+          <div class="title-copy">
+            <p class="eyebrow">和風ホラー スライドパズル脱出ゲーム</p>
+            <div class="title-lockup">
+              <h1 id="title-heading" class="title-vertical">眼を、閉じるな。</h1>
+              <p class="title-description">目を開けたままでいれば、怪異は近づかない。</p>
+            </div>
+          </div>
+
+          <div class="stage-section">
+            <div class="stage-section-heading">
+              <h2>封印された間</h2>
+              <p>クリア状況はこの端末に保存されます。</p>
+            </div>
+            <div id="stage-grid" class="stage-grid" aria-label="ステージ選択"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-game" class="screen" aria-labelledby="game-stage-name" data-horror-level="0">
+        <div id="game-shell" class="game-shell">
+          <header class="status-bar">
+            <div id="eye-status-indicator" class="status-pill">
+              <span class="status-icon" aria-hidden="true">👁️</span>
+              <span id="eye-status-text">開いている</span>
+            </div>
+            <div class="status-stage">
+              <p class="status-label">探索中</p>
+              <h2 id="game-stage-name">壱ノ間</h2>
+            </div>
+            <div class="status-pill status-pill-right">
+              <span class="status-label">経過</span>
+              <strong id="timer-text">00:00</strong>
+            </div>
+          </header>
+
+          <section class="approach-panel" aria-labelledby="approach-title">
+            <div class="approach-meta">
+              <div>
+                <p id="approach-title" class="status-label">怪異接近</p>
+                <p class="approach-copy">目を閉じるか、画面から逸れると怪異が近づきます。</p>
+              </div>
+              <strong id="approach-value">0%</strong>
+            </div>
+            <div class="approach-bar" aria-hidden="true">
+              <div id="approach-fill" class="approach-fill"></div>
+            </div>
+          </section>
+
+          <section id="horror-stage" class="horror-stage" aria-label="怪異の気配演出">
+            <div class="horror-vignette" aria-hidden="true"></div>
+            <canvas id="noise-canvas" class="noise-canvas" aria-hidden="true"></canvas>
+            <div class="horror-hands" aria-hidden="true">
+              <span id="horror-hand-left" class="horror-hand hand-left"></span>
+              <span id="horror-hand-right" class="horror-hand hand-right"></span>
+            </div>
+            <img id="horror-face" class="horror-face" alt="怪異の気配" />
+            <div class="horror-caption">
+              <p class="status-label">気配</p>
+              <p id="horror-message">静寂が耳に貼りつく。</p>
+            </div>
+          </section>
+
+          <section class="puzzle-shell" aria-labelledby="puzzle-title">
+            <div class="puzzle-header">
+              <div>
+                <p class="status-label">封印の仕掛け</p>
+                <h2 id="puzzle-title">結界の欠片</h2>
+              </div>
+              <div class="move-counter">
+                <span>移動回数</span>
+                <strong id="move-count">0</strong>
+              </div>
+            </div>
+
+            <div id="puzzle-board" class="puzzle-board" role="grid" aria-live="polite"></div>
+            <p class="puzzle-note">隣り合うピースのみ動かせます。完成させれば脱出成功です。</p>
+          </section>
+        </div>
+      </section>
+
+      <section id="screen-clear" class="screen" aria-labelledby="clear-title">
+        <div class="panel panel-centered panel-clear">
+          <p class="eyebrow">静けさが戻る</p>
+          <h1 id="clear-title" class="panel-title">脱出成功</h1>
+          <p id="clear-summary" class="panel-copy">壱ノ間を抜け出した。</p>
+          <div class="result-grid">
+            <div class="result-card">
+              <span>クリアタイム</span>
+              <strong id="clear-time">00:00</strong>
+            </div>
+            <div class="result-card">
+              <span>移動回数</span>
+              <strong id="clear-moves">0</strong>
+            </div>
+          </div>
+          <div class="button-row">
+            <button id="clear-next-button" class="ghost-button" type="button">次のステージへ</button>
+            <button id="clear-title-button" class="ghost-button ghost-button-subtle" type="button">
+              タイトルへ戻る
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-gameover" class="screen" aria-labelledby="gameover-title">
+        <div class="panel gameover-panel">
+          <div class="gameover-visual" aria-hidden="true">
+            <img id="gameover-face" class="gameover-face" alt="迫る怪異" />
+            <div class="gameover-flash"></div>
+          </div>
+          <div class="gameover-copy">
+            <p class="eyebrow">見つかった</p>
+            <h1 id="gameover-title" class="panel-title">もう遅い。</h1>
+            <p id="gameover-summary" class="panel-copy">怪異が目前まで迫った。</p>
+            <div class="result-grid">
+              <div class="result-card">
+                <span>経過時間</span>
+                <strong id="gameover-time">00:00</strong>
+              </div>
+              <div class="result-card">
+                <span>移動回数</span>
+                <strong id="gameover-moves">0</strong>
+              </div>
+            </div>
+            <div id="gameover-actions" class="button-row delayed-actions">
+              <button id="retry-button" class="ghost-button" type="button">もう一度挑戦する</button>
+              <button id="gameover-title-button" class="ghost-button ghost-button-subtle" type="button">
+                タイトルへ戻る
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
