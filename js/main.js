@@ -88,6 +88,7 @@ const state = {
     threshold: 0.21,
     cameraLabel: "",
     cameraFacingMode: "",
+    trackingHold: false,
   },
   gameActive: false,
   elapsedTimerId: 0,
@@ -142,6 +143,13 @@ function updateEyeStatus(stateSnapshot) {
     elements.eyeStatusIndicator.dataset.state = "missing";
     elements.eyeStatusText.textContent = "逸らしている";
     elements.cameraDebugText.textContent = `${cameraName}で顔を検出できていません。正面を向いて少し明るくしてください。`;
+    return;
+  }
+
+  if (stateSnapshot.trackingHold) {
+    elements.eyeStatusIndicator.dataset.state = "open";
+    elements.eyeStatusText.textContent = "追跡中";
+    elements.cameraDebugText.textContent = `${cameraName}の認識が一瞬揺れています。正面を向いたまま少し待つと復帰します。`;
     return;
   }
 

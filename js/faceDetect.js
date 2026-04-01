@@ -3,6 +3,7 @@ const DEFAULT_EAR_THRESHOLD = 0.21;
 const MIN_EAR_THRESHOLD = 0.18;
 const MAX_EAR_THRESHOLD = 0.26;
 const CLOSED_GRACE_MS = 500;
+const FACE_LOST_GRACE_MS = 1200;
 
 const CAMERA_CONSTRAINTS = [
   {
@@ -102,6 +103,7 @@ export class FaceDetector {
     this.openEyeBaseline = 0;
     this.cameraLabel = "";
     this.cameraFacingMode = "";
+    this.lastFaceSeenAt = 0;
 
     this.lastState = {
       eyeOpen: true,
@@ -112,6 +114,7 @@ export class FaceDetector {
       threshold: DEFAULT_EAR_THRESHOLD,
       cameraLabel: "",
       cameraFacingMode: "",
+      trackingHold: false,
     };
   }
 
@@ -189,17 +192,17 @@ export class FaceDetector {
 
         try {
           const faceapi = window.faceapi;
-          const detection = await faceapi
-            .detectSingleFace(
+          const detections = await faceapi
+            .detectAllFaces(
               this.videoElement,
               new faceapi.TinyFaceDetectorOptions({
-                inputSize: 320,
-                scoreThreshold: 0.25,
+                inputSize: 512,
+                scoreThreshold: 0.12,
               })
             )
             .withFaceLandmarks(true);
 
-          this.processDetection(detection);
+          this.processDetection(this.pickBestDetection(detections));
         } catch (error) {
           console.error(error);
         } finally {
@@ -209,6 +212,25 @@ export class FaceDetector {
 
       this.loop();
     });
+  }
+
+  pickBestDetection(detections) {
+    if (!detections?.length) {
+      return null;
+    }
+
+    return detections.reduce((best, current) => {
+      const bestBox = best?.detection?.box;
+      const currentBox = current?.detection?.box;
+
+      if (!bestBox) {
+        return current;
+      }
+
+      const bestArea = bestBox.width * bestBox.height;
+      const currentArea = currentBox.width * currentBox.height;
+      return currentArea > bestArea ? current : best;
+    }, null);
   }
 
   getThreshold() {
@@ -238,19 +260,23 @@ export class FaceDetector {
 
     if (!detection) {
       this.closedSince = 0;
+      const recentFace = now - this.lastFaceSeenAt <= FACE_LOST_GRACE_MS;
+
       this.emitState({
-        eyeOpen: false,
-        faceDetected: false,
-        leftEar: 0,
-        rightEar: 0,
-        averageEar: 0,
+        eyeOpen: recentFace ? this.lastState.eyeOpen : false,
+        faceDetected: recentFace,
+        leftEar: recentFace ? this.lastState.leftEar : 0,
+        rightEar: recentFace ? this.lastState.rightEar : 0,
+        averageEar: recentFace ? this.lastState.averageEar : 0,
         threshold: this.getThreshold(),
         cameraLabel: this.cameraLabel,
         cameraFacingMode: this.cameraFacingMode,
+        trackingHold: recentFace,
       });
       return;
     }
 
+    this.lastFaceSeenAt = now;
     const leftEar = calculateEar(detection.landmarks.getLeftEye());
     const rightEar = calculateEar(detection.landmarks.getRightEye());
     const averageEar = (leftEar + rightEar) / 2;
@@ -284,6 +310,7 @@ export class FaceDetector {
       threshold,
       cameraLabel: this.cameraLabel,
       cameraFacingMode: this.cameraFacingMode,
+      trackingHold: false,
     });
   }
 
