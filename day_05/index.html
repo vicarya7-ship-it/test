@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎵 イントロドン！</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ═══ TITLE SCREEN ═══ -->
+  <div id="screen-title" class="screen active">
+    <div class="title-bg-grid"></div>
+    <div class="title-content">
+      <div class="title-logo">
+        <span class="logo-note">♪</span>
+        <h1 class="logo-text">イントロドン<span class="logo-exclaim">！</span></h1>
+        <p class="logo-sub">INTRO QUIZ GAME</p>
+      </div>
+
+      <div class="section-label">PLAY MODE</div>
+      <div class="mode-switch">
+        <button id="mode-btn-genre" type="button" class="mode-btn active" data-mode="genre">ジャンルで遊ぶ</button>
+        <button id="mode-btn-artist" type="button" class="mode-btn" data-mode="artist">アーティストで遊ぶ</button>
+      </div>
+
+      <section id="mode-panel-genre" class="mode-panel active">
+        <div class="section-label mode-panel-label">GENRE SELECT</div>
+        <div class="genre-grid" id="genre-grid"></div>
+        <p class="mode-note">選んだジャンルの曲からランダムに出題されます。もちろん「ランダム」も選べます。</p>
+      </section>
+
+      <section id="mode-panel-artist" class="mode-panel">
+        <div class="section-label mode-panel-label">ARTIST SEARCH</div>
+        <form id="artist-search-form" class="artist-search-form" autocomplete="off">
+          <input
+            id="artist-search-input"
+            class="artist-search-input"
+            type="search"
+            placeholder="宇多田ヒカル / ずとまよ / Taylor Swift...（略称も可）"
+            aria-label="アーティスト名を検索"
+          />
+          <button id="artist-search-btn" class="artist-search-btn" type="submit">検索</button>
+        </form>
+        <p id="search-status" class="search-status">アーティスト名で検索して、遊びたい1組を選んでください。</p>
+        <div id="artist-results" class="artist-results" aria-live="polite"></div>
+
+        <section id="selected-artist-card" class="artist-selected-card hidden" aria-live="polite">
+          <div id="selected-artist-art" class="artist-selected-art artist-selected-placeholder">♪</div>
+          <div class="artist-selected-copy">
+            <div class="artist-selected-label">SELECTED ARTIST</div>
+            <div id="selected-artist-name" class="artist-selected-name"></div>
+            <div id="selected-artist-meta" class="artist-selected-meta"></div>
+            <div id="selected-artist-note" class="artist-selected-note"></div>
+          </div>
+        </section>
+      </section>
+
+      <div class="section-label">QUESTIONS</div>
+      <div class="count-selector">
+        <button class="count-btn" data-count="5">5問</button>
+        <button class="count-btn active" data-count="10">10問</button>
+        <button class="count-btn" data-count="15">15問</button>
+      </div>
+
+      <button id="start-btn" class="start-btn" disabled>
+        <span id="start-btn-label">ジャンルを選んでスタート</span>
+        <span class="btn-icon">▶</span>
+      </button>
+      <p class="start-note">* iTunes Store の30秒プレビューを使用しています</p>
+    </div>
+  </div>
+
+  <!-- ═══ LOADING SCREEN ═══ -->
+  <div id="screen-loading" class="screen">
+    <div class="loading-inner">
+      <div class="loading-waveform">
+        <span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <p id="loading-text" class="loading-text">楽曲を読み込み中...</p>
+    </div>
+  </div>
+
+  <!-- ═══ QUIZ SCREEN ═══ -->
+  <div id="screen-quiz" class="screen">
+    <header class="quiz-header">
+      <div class="header-left">
+        <span class="q-genre" id="q-genre-badge">J-POP</span>
+        <span class="q-count" id="q-count-label">問題 1 / 10</span>
+      </div>
+      <div class="header-right">
+        <div class="score-wrap">
+          <span class="score-label">SCORE</span>
+          <span class="score-value" id="score-display">0</span>
+        </div>
+        <button id="btn-quiz-title" class="quiz-exit-btn" type="button">タイトルへ戻る</button>
+      </div>
+    </header>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+
+    <div class="quiz-body">
+      <div class="art-wrap" id="art-wrap">
+        <img id="album-art" src="" alt="album art" class="album-art blurred" />
+        <div class="art-overlay" id="art-overlay">
+          <span>?</span>
+        </div>
+      </div>
+
+      <div class="waveform" id="waveform">
+        <div class="waveform-bars" id="waveform-bars"></div>
+        <div class="play-duration" id="play-duration">
+          <span class="duration-now" id="duration-now">1秒</span>
+          <span class="duration-label">再生中</span>
+        </div>
+      </div>
+
+      <div class="level-dots" id="level-dots">
+        <span class="dot active" data-level="0"></span>
+        <span class="dot" data-level="1"></span>
+        <span class="dot" data-level="2"></span>
+        <span class="dot" data-level="3"></span>
+        <span class="dot" data-level="4"></span>
+      </div>
+
+      <div class="play-controls">
+        <button id="btn-play" class="btn-play">
+          <span id="play-icon">▶</span>
+          <span id="play-label">再生する</span>
+        </button>
+        <button id="btn-hint" class="btn-hint">
+          💡 もっと長く聴く <span class="hint-cost">(-100pt)</span>
+        </button>
+      </div>
+
+      <div class="choices" id="choices"></div>
+    </div>
+  </div>
+
+  <!-- ═══ ANSWER SCREEN (overlay) ═══ -->
+  <div id="answer-overlay" class="answer-overlay hidden">
+    <div class="answer-card" id="answer-card">
+      <div class="answer-verdict" id="answer-verdict"></div>
+      <img id="ans-art" class="ans-art" src="" alt="" />
+      <div class="ans-track" id="ans-track"></div>
+      <div class="ans-artist" id="ans-artist"></div>
+      <div class="ans-pts" id="ans-pts"></div>
+      <div class="answer-actions">
+        <button id="btn-answer-next" class="answer-btn-primary" type="button">次に進む</button>
+        <button id="btn-answer-title" class="answer-btn-secondary" type="button">タイトルへ戻る</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ RESULT SCREEN ═══ -->
+  <div id="screen-result" class="screen">
+    <div class="result-inner">
+      <div class="result-logo">🎵</div>
+      <h2 class="result-title">RESULT</h2>
+      <p id="result-context" class="result-context"></p>
+      <div class="result-score-wrap">
+        <span class="result-score" id="result-score">0</span>
+        <span class="result-score-unit">pt</span>
+      </div>
+      <div class="result-rank" id="result-rank"></div>
+      <div class="result-stats" id="result-stats"></div>
+      <div class="result-history" id="result-history"></div>
+
+      <section class="result-share">
+        <div class="result-share-title">SHARE</div>
+        <div id="result-share-url" class="result-share-url"></div>
+        <div class="result-share-btns">
+          <button id="btn-share-x" class="share-btn share-btn-x">Xでシェア</button>
+          <button id="btn-copy-url" class="share-btn share-btn-copy">URLをコピー</button>
+        </div>
+        <p id="share-feedback" class="share-feedback"></p>
+      </section>
+
+      <div class="result-btns">
+        <button class="result-btn-primary" id="btn-retry">もう一度 🔁</button>
+        <button class="result-btn-secondary" id="btn-title">トップへ戻る</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="audio-player" preload="auto"></audio>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
